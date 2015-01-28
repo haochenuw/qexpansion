@@ -11,6 +11,7 @@ class QExpComputer(object):
             raise ValueError('the second argument must divide the conductor of E.')
 
         self.f = E.modular_form()
+
     def __repr__(self):
         return 'Computer for the q-expansion of the newform attached to the elliptic cuvrve %s at the cusp 1/%s'%(self.curve().label(), self.denom())
 
@@ -44,7 +45,46 @@ class QExpComputer(object):
         return
 
     def expansion_data(self):
-        return [(cchi,) for chi in self.characters()]
+        result =[]
+        for chi in self.characters():
+            if chi.conductor() == p: # non-trivial conductor
+                Tchi = TwistedNewform(self.f,chi)
+                result.append((chi, Tchi.constant(),Tchi.newform()))
+
+    def expansion_numerical(self,n,prec = 100):
+        # return the n-th coefficient of the expansion of self.f at 1/self.denom()
+        # only implemented when self.p = p is a prime and v_p(N) == 2.
+        f = self.f
+        wf = f.atkin_lehner_eigenvalue()
+        p = self.p
+        N = self.N
+        an = self.E.an(n)
+
+
+        C = ComplexField(prec)
+        if not p.is_prime() || N.valuation(p) != 2:
+            raise NotImplementedError
+
+        result = 0
+        for chi, wchi, gchi, phi in expansion_data(self):
+            gausschi = chi.bar().gauss_sum().complex_embeddings()[0]
+            Nchi = gchi.level()
+            verbose('Nchi = %s'%Nchi)
+            m = Nchi.valuation(p)
+            if m == 0:
+                result += an*gausschi*wchi*C(chi.bar()(n))
+            elif m == 1:
+                bp = gchi.qexp(p+1)[-1]
+                result +=  (gausschi*wchi*C(chi.bar()(n)))*(-bp/p)
+                if n % p == 0:
+                    result += p*self.E.an(n//p)*wchi*C(chi.bar()(n//p))
+
+            elif m == 2:
+                result += gausschi*wf*wchi*chi(n)*f.an(n)
+            else:
+                raise ValueError('the valuation at p is wrong. Pleaes debug.')
+        # finally we add the last term -f
+        return result - an
 
 
     def compute_expansion(self,prec):
@@ -103,12 +143,29 @@ class TwistedNewform(object):
 
         raise ValueError('newform not found! Please debug.')
 
+    def numerical_global_constant(self):
+        chisquare = (self.chi)**2
+        if chisquare.conductor() == 1: # the twist is again a form on Gamma0(N)
+            return self.f.atkin_lehner_eigenvalue()
+        else:
+            G = Gamma0(self.level())
+            gchi,phi = self.newform()
+            for gg in G.gens():
+                try:
+                    w = period_ratio(gchi,phi,gg)
+                    return w
+                except ValueError, msg:
+                    verbose('error = %s'%msg)
+                    verbose('gg = %s giving virtually 0 period. '%gg)
+        raise ValueError('did not find eigenvalue')
+
+
     def B_bound(self):
         N = self.f.level()
         k = self.f.weight()
         return 2*CuspForms(N,k).dimension()
 
-    def twist_level(self):
+    def level(self):
         if self.gchi == None:
             return self.newform()[0].level()
         else:
@@ -143,7 +200,6 @@ def all_coeffs_newforms(level,weight,prec):
             newformlist = CuspForms(M,k).newforms('a')
             for newform in newformlist:
                 result.append(expansion(newform,prec,d,N))
-
                 twist_const = QQ(newform.atkin_lehner_eigenvalue()*((QQ(N/(d**2*M)))**2)) # !
                 print newform, M,d,twist_const
                 result_wNtwisted.append([a*twist_const for a in expansion(newform,prec,N//(d*M),N)])
@@ -174,3 +230,62 @@ def solve_over_nf(A,v):
     vnp = np.array([v])
     B1 = np.concatenate((vnp,Anp),axis = 0)
     return matrix(B1).left_kernel()
+
+
+def period_ratio(f,phi,gg,terms = 1000,prec = 100):
+    C = ComplexField(prec)
+    N = f.level()
+    wNgg = wN(gg.matrix(),N)
+    f = f.q_expansion(terms)
+    ff = f.shift(-1).integral()
+    v = list(ff.polynomial())
+    K = v[0].parent()
+    verbose('field = %s'%K)
+    if K is not QQ:
+        # phi = K.complex_embeddings()[0]
+        q = var('q')
+        ffpC = C[q]([phi(a) for a in v])
+        ffpCbar = C[q]([phi(a).conjugate() for a in v])
+    else:
+        q = var('q')
+        ffpC = C[q](v)
+        ffpCbar = ffpC
+
+    r1 = periodgC(ffpC,wNgg,terms,prec)
+
+    if abs(r1) < 1e-6:
+        raise ValueError('denominator of ratio too small = %s'%abs(r1))
+    r2 = periodgC(ffpCbar,gg,terms,prec)
+    #print 'r1 = %s, r2 = %s'%(r1,r2)
+    return r2/r1
+
+
+def periodgC(ffpC,gg,terms,prec):
+    """
+    given a newform f attached to elliptic
+    curve E, an element gg in Gamma0(N),
+    computes the period
+    2*pi*i*\int_{a}^{gg(a)} f(z) dz
+    by truncating the q-expansion of f to a polynomial
+    with degree = terms, a is the optimal point in [Cremona97].
+    """
+    C = ComplexField(prec)
+    a=gg[0,0]
+    b=gg[0,1]
+    c=gg[1,0]
+    d=gg[1,1]
+
+    if c == 0: # parabolic matrices have zero period, stated in Cremona.
+        return 0
+    else:
+        tau=-(d/c)+(C(I)/abs(c))
+        gammatau=(a*tau+b)/(c*tau+d)
+        return ffpC.substitute(exp(2*C(pi)*C(I)*gammatau)) - ffpC.substitute(exp(2*C(pi)*C(I)*tau))
+
+
+def fricke(N):
+    return matrix([[0,-1],[N,0]])
+
+
+def wN(g,N):
+    return fricke(N)*(g*~fricke(N))
