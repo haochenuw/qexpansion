@@ -60,9 +60,8 @@ class QExpComputer(object):
         N = self.N
         an = self.E.an(n)
 
-
         C = ComplexField(prec)
-        if not p.is_prime() || N.valuation(p) != 2:
+        if (not p.is_prime() or N.valuation(p) != 2):
             raise NotImplementedError
 
         result = 0
@@ -97,11 +96,9 @@ class TwistedNewform(object):
         self.chi = chi
         N = f.level()
         Q = chi.conductor()
-        if N % Q:
-            raise ValueError('Q( = %s) has to divide N( = %s)'%(Q,N))
-        self.gchi = None
         self.Q = Q
         self.N = N
+        self.newformdata = None
 
     def __repr__(self):
         return 'Twist of Newform %s by chi = %s'%(self.f.elliptic_curve().label(),self.chi)
@@ -112,8 +109,11 @@ class TwistedNewform(object):
         where g is a newform of some level corr to f_chi
         and phi is a embedding of K_g into K_chi
         """
+        if self.newformdata is not None:
+            return self.newformdata
         f = self.f
         N = self.N
+        chi = self.chi
         Q = self.Q
         if Q == 1:
             print 'twist is trivial'
@@ -122,23 +122,27 @@ class TwistedNewform(object):
         B = self.B_bound()
         verbose('B-bound = %s'%B)
 
-        fqB = list(f.qexp(B+1))
+        fqB = list(f.qexp(B+10))
         chisquare = (chi^2).primitive_character()
         Q1 = chisquare.conductor()
 
         Kchi = chi.base_ring()
-
         for M in N.divisors():
             if M % Q1 == 0:
+                verbose('Working on level M = %s'%M)
                 glist = CuspForms(chisquare.extend(M),2).newforms('a')
                 for g in glist:
+                    verbose('Working with one g = %s'%g)
                     Kg = g.base_ring()
                     v = Kg.embeddings(Kchi)
                     if len(v) > 0:
-                        gqB  = list(g.qexp(B+1))
+                        gqB  = list(g.qexp(B+10))
                         for phi in v:
+                            print 'phi = %s'%phi
+                            print 'fqB = %s'
                             if all([phi(gqB[n]) == fqB[n]*chi(n) for n in range(1,B+1) if gcd(n,Q) == 1]):
-                                self.gchi = g # save the result
+                                print 'all checked out '
+                                self.newformdata = (g,phi) # save the result
                                 return (g,phi)
 
         raise ValueError('newform not found! Please debug.')
@@ -148,11 +152,12 @@ class TwistedNewform(object):
         if chisquare.conductor() == 1: # the twist is again a form on Gamma0(N)
             return self.f.atkin_lehner_eigenvalue()
         else:
-            G = Gamma0(self.level())
             gchi,phi = self.newform()
+            G = Gamma0(gchi.level())
             for gg in G.gens():
                 try:
                     w = period_ratio(gchi,phi,gg)
+                    print 'gg = %s'%gg
                     return w
                 except ValueError, msg:
                     verbose('error = %s'%msg)
@@ -165,23 +170,39 @@ class TwistedNewform(object):
         k = self.f.weight()
         return 2*CuspForms(N,k).dimension()
 
-    def level(self):
-        if self.gchi == None:
-            return self.newform()[0].level()
+
+    def expansion_data(self):
+        """
+        return a FormalSum
+        representing the expansion of f|W_NR_\chi(p)W_N.
+        (c,d) such that
+        f|W_N R_\chi(p) W_N. = w(f)w(g_chi)* \sum c_i\bar(g(q^d_i))
+        """
+        p = self.Q
+        if p == 1:
+            return (1,1)
         else:
-            return self.gchi.level()
+            g, phi = self.newform()
+            m = g.level().valuation(p)
+            print 'got here!'
+            print 'm = %s'%m
+            bp = g.qexp(p+1)[-1]
+            if m == 2:
+                print 'got here'
+                return [(1,1)]
+            elif m == 1:
+                return [(CC(-bp/p), 1),(p,p)]
+            elif m == 0:
+                return [(CC(1/p),1),(-bp,p),(p^2,p^2)]
 
-    def Qth_power_of_global_constant(self):
-        prec = 100
-        Q = self.Q # we are going to raise to Q-th power.
-        gchi = self.gchi
-        vgchi  = list(gchi.q_expansion(prec+1)**Q)[:prec]
-        A,B = all_coeffs_newforms(self.level(),self.weight()*Q,prec)
-        C = solve_over_nf(A,vgchi)
-        sol = -C.basis()[0][1:]
+    def expansion_string(self):
+        lst = self.expansion_data()
+        return FormalSum([(CC(a),'B%s'%b) for a,b in lst],CC)
 
-        print '%s-th power of w is: '%Q
-        return solv*matrix(B)[Q+1]
+
+
+
+
 
 def all_coeffs_newforms(level,weight,prec):
     """
@@ -232,7 +253,7 @@ def solve_over_nf(A,v):
     return matrix(B1).left_kernel()
 
 
-def period_ratio(f,phi,gg,terms = 1000,prec = 100):
+def period_ratio(f,phi,gg,terms = 2000,prec = 100):
     C = ComplexField(prec)
     N = f.level()
     wNgg = wN(gg.matrix(),N)
@@ -256,8 +277,11 @@ def period_ratio(f,phi,gg,terms = 1000,prec = 100):
     if abs(r1) < 1e-6:
         raise ValueError('denominator of ratio too small = %s'%abs(r1))
     r2 = periodgC(ffpCbar,gg,terms,prec)
-    #print 'r1 = %s, r2 = %s'%(r1,r2)
-    return r2/r1
+    print 'r1 = %s, r2 = %s'%(r1,r2)
+    if abs(r2/r1-1) < 1e-3:
+        return r2/r1
+    else:
+        raise ValueError('Too far away from 1 = %s'%abs(r2/r1-1))
 
 
 def periodgC(ffpC,gg,terms,prec):
