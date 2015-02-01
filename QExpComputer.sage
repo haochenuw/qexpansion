@@ -126,6 +126,7 @@ class TwistedNewform(object):
         chisquare = (chi^2).primitive_character()
         Q1 = chisquare.conductor()
 
+        chi = chi.primitive_character()
         Kchi = chi.base_ring()
         for M in N.divisors():
             if M % Q1 == 0:
@@ -139,7 +140,8 @@ class TwistedNewform(object):
                         gqB  = list(g.qexp(B+10))
                         for phi in v:
                             print 'phi = %s'%phi
-                            print 'fqB = %s'
+                            print 'gqB = %s'%gqB
+                            print 'fqBchi = %s'%[fqB[n]*chi(n) for n in range(1,B+1)]
                             if all([phi(gqB[n]) == fqB[n]*chi(n) for n in range(1,B+1) if gcd(n,Q) == 1]):
                                 print 'all checked out '
                                 self.newformdata = (g,phi) # save the result
@@ -284,27 +286,6 @@ def period_ratio(f,phi,gg,terms = 2000,prec = 100):
         raise ValueError('Too far away from 1 = %s'%abs(r2/r1-1))
 
 
-def periodgC(ffpC,gg,terms,prec):
-    """
-    given a newform f attached to elliptic
-    curve E, an element gg in Gamma0(N),
-    computes the period
-    2*pi*i*\int_{a}^{gg(a)} f(z) dz
-    by truncating the q-expansion of f to a polynomial
-    with degree = terms, a is the optimal point in [Cremona97].
-    """
-    C = ComplexField(prec)
-    a=gg[0,0]
-    b=gg[0,1]
-    c=gg[1,0]
-    d=gg[1,1]
-
-    if c == 0: # parabolic matrices have zero period, stated in Cremona.
-        return 0
-    else:
-        tau=-(d/c)+(C(I)/abs(c))
-        gammatau=(a*tau+b)/(c*tau+d)
-        return ffpC.substitute(exp(2*C(pi)*C(I)*gammatau)) - ffpC.substitute(exp(2*C(pi)*C(I)*tau))
 
 
 def fricke(N):
