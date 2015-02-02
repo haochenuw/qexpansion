@@ -1,3 +1,5 @@
+load('GlobalConstant.sage')
+
 class TwistedNewform(object):
 
     def __init__(self,f,chi,check =False):
@@ -48,11 +50,9 @@ class TwistedNewform(object):
                     if len(v) > 0:
                         gqB  = list(g.qexp(B+10))
                         for phi in v:
-                            print 'phi = %s'%phi
-                            print 'gqB = %s'%gqB
-                            print 'fqBchi = %s'%[fqB[n]*chi(n) for n in range(1,B+1)]
+                            verbose('phi = %s'%phi)
                             if all([phi(gqB[n]) == fqB[n]*chi(n) for n in range(1,B+1) if gcd(n,Q) == 1]):
-                                print 'all checked out '
+                                verbose('all checked out')
                                 self.newformdata = (g,phi) # save the result
                                 return (g,phi)
 
@@ -95,11 +95,8 @@ class TwistedNewform(object):
         else:
             g, phi = self.newform()
             m = g.level().valuation(p)
-            print 'got here!'
-            print 'm = %s'%m
             bp = g.qexp(p+1)[-1]
             if m == 2:
-                print 'got here'
                 return [(1,1)]
             elif m == 1:
                 return [(CC(-bp/p), 1),(p,p)]
@@ -109,3 +106,40 @@ class TwistedNewform(object):
     def expansion_string(self):
         lst = self.expansion_data()
         return FormalSum([(CC(a),'B%s'%b) for a,b in lst],CC)
+
+    def al_eigenvalue(self):
+        return self.f.atkin_lehner_eigenvalue()
+
+    def pseudo_eigenvalue(self):
+        g,phi = self.newform()
+        return global_constant(g,phi)
+
+    def expansion(self,terms):
+        """
+        returns the numerical q-expansion of f|W_NR_chiW_N
+        """
+        chi = self.chi.primitive_character()
+        chibar = chi.bar()
+        gauss = chibar.gauss_sum_numerical()
+        wf = self.al_eigenvalue()
+        wg = self.pseudo_eigenvalue()
+        const = wf*wg*gauss
+        print 'const = %s'%const
+        result = []
+        v = self.expansion_data()
+        max_degree = max([d for c,d in v])
+        print 'max degree = %s'%max_degree
+        g,phi = self.newformdata
+        gg = g.qexp(terms*max_degree)
+        vggp = list(gg.polynomial())
+        vggpC = [phi(a) for a in vggp]
+        result = [0 for _ in range(terms)]
+        for c, d in v:
+            newcoeffs = vggpC[::ZZ(d)][:terms]
+            result = [a+c*b for a,b in zip(result,newcoeffs)]
+        q = var('q')
+        return CC[[q]]([const*t for t in vggpC]).add_bigoh(terms)
+
+
+
+
