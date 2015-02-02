@@ -132,7 +132,7 @@ class TwistedNewform(object):
         g,phi = self.newformdata
         gg = g.qexp(terms*max_degree)
         vggp = list(gg.polynomial())
-        vggpC = [phi(a) for a in vggp]
+        vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
         result = [0 for _ in range(terms)]
         for c, d in v:
             newcoeffs = vggpC[::ZZ(d)][:terms]

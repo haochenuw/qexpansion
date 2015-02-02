@@ -1,4 +1,5 @@
 class QExpComputer(object):
+
     def __init__(self,E,p):
         #if not isinstance(E,EllipticCurve):
         #    raise ValueError('The first argument must be an elliptic curve')
@@ -9,6 +10,8 @@ class QExpComputer(object):
             raise ValueError('the second argument must be a prime power.')
         elif self.N % p:
             raise ValueError('the second argument must divide the conductor of E.')
+        if not is_prime(p) and p >= 5 and self.N.valuation(p) == 2:
+            raise NotImplementedError
 
         self.f = E.modular_form()
 
@@ -24,71 +27,43 @@ class QExpComputer(object):
     def characters(self):
         """
         return the set of Dirichlet characters of modulus N with conductor dividing p,
-        which is relevanet of the computation of expansions.
+        which is relevant of the computation of expansions.
         """
-        return list(DirichletGroup(self.p))
+        return [chi for chi in list(DirichletGroup(self.p)) if chi.conductor() > 1]
 
-    def newform_twist(self,chi):
+    def _expansion_data(self):
         """
-        some work should be put here
+        get the information at each chi
         """
-
-    def pseudo_eigenvalue_numeric(self,chi):
-        pass
-
-
-    def fchiwN(self,chi):
-        """
-        a simple formula
-        """
-        gchi, Nchi = self.newform_twist(chi)
-        return
-
-    def expansion_data(self):
         result =[]
         for chi in self.characters():
             if chi.conductor() == p: # non-trivial conductor
                 Tchi = TwistedNewform(self.f,chi)
-                result.append((chi, Tchi.constant(),Tchi.newform()))
+                result.append((Tchi.constant(),Tchi.newform()))
+        return result
 
-    def expansion_numerical(self,n,prec = 100):
+    def expansion_numerical(self,terms = 20,prec = 53):
         # return the n-th coefficient of the expansion of self.f at 1/self.denom()
         # only implemented when self.p = p is a prime and v_p(N) == 2.
         f = self.f
-        wf = f.atkin_lehner_eigenvalue()
         p = self.p
         N = self.N
         an = self.E.an(n)
 
         C = ComplexField(prec)
-        if (not p.is_prime() or N.valuation(p) != 2):
-            raise NotImplementedError
+        q = var('q')
 
-        result = 0
-        for chi, wchi, gchi, phi in expansion_data(self):
-            gausschi = chi.bar().gauss_sum().complex_embeddings()[0]
-            Nchi = gchi.level()
-            verbose('Nchi = %s'%Nchi)
-            m = Nchi.valuation(p)
-            if m == 0:
-                result += an*gausschi*wchi*C(chi.bar()(n))
-            elif m == 1:
-                bp = gchi.qexp(p+1)[-1]
-                result +=  (gausschi*wchi*C(chi.bar()(n)))*(-bp/p)
-                if n % p == 0:
-                    result += p*self.E.an(n//p)*wchi*C(chi.bar()(n//p))
+        result = -f.qexp(terms)
+        verbose('result = %s'%result)
+        for chi in self.characters():
+            verbose('chi = %s'%chi)
+            Tchi = TwistedNewform(self.f,chi)
 
-            elif m == 2:
-                result += gausschi*wf*wchi*chi(n)*f.an(n)
-            else:
-                raise ValueError('the valuation at p is wrong. Pleaes debug.')
-        # finally we add the last term -f
-        return result - an
+            exp_chi = Tchi.expansion(terms)
+            verbose('exp_chi = %s'%exp_chi)
+            result += exp_chi
 
-
-    def compute_expansion(self,prec):
-        pass
-
+        return result/euler_phi(p)
 
 
 
