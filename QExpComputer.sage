@@ -1,3 +1,6 @@
+load('TwistedNewform.sage')
+
+
 class QExpComputer(object):
 
     def __init__(self,E,p):
@@ -42,13 +45,16 @@ class QExpComputer(object):
                 result.append((Tchi.constant(),Tchi.newform()))
         return result
 
-    def expansion_numerical(self,terms = 20,prec = 53):
-        # return the n-th coefficient of the expansion of self.f at 1/self.denom()
-        # only implemented when self.p = p is a prime and v_p(N) == 2.
+    def expansion_numerical(self,numerator = -1,terms = 20,prec = 53):
+        """
+        return the first (terms) term of the q-expansion of self.f at the cusp numerator/self.denom().
+        The detault numerator is -1.
+        only implemented when self.p = p is a prime and v_p(N) == 2.
+        """
         f = self.f
         p = self.p
         N = self.N
-        an = self.E.an(n)
+        a = numerator
 
         C = ComplexField(prec)
         q = var('q')
@@ -61,22 +67,19 @@ class QExpComputer(object):
 
             exp_chi = Tchi.expansion(terms)
             verbose('exp_chi = %s'%exp_chi)
-            result += exp_chi
-
+            result += exp_chi*CC(chi(-a))
         return result/euler_phi(p)
 
 
 
 
 
-
+"""
 
 def all_coeffs_newforms(level,weight,prec):
-    """
-    return a matrix of coefficients of cusp forms in the canonical basis of S_k(N)
-    up to prec, and(!) the corresponding matrix of the same forms under under w_N.
-    See the documentation for more details
-    """
+    #return a matrix of coefficients of cusp forms in the canonical basis of S_k(N)
+    #up to prec, and(!) the corresponding matrix of the same forms under under w_N.
+    #See the documentation for more details
     indexes = []
     result = []
     result_wNtwisted = []
@@ -95,10 +98,6 @@ def all_coeffs_newforms(level,weight,prec):
 
 
 def expansion(f,prec,d,N):
-    """
-    return the first prec terms of f|B_d = f(q^d)
-    where f is newform of level N' and N'd divides N.
-    """
     Nprime = f.level()
     assert N % (Nprime*d) == 0
 
@@ -159,3 +158,4 @@ def fricke(N):
 
 def wN(g,N):
     return fricke(N)*(g*~fricke(N))
+"""

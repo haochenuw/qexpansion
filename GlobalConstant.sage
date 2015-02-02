@@ -1,5 +1,4 @@
 load('PeriodMapping.sage')
-load('QExpComputer.sage')
 
 def generate_points(N,number_of_points = 10):
     """
