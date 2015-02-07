@@ -113,7 +113,7 @@ class TwistedNewform(object):
         else:
             # second case where twist has non-trivial p-level
             # f_chi = g - ap(g)*g|B_p
-            bp = list(g.qexp(p+1))[-1]
+            bp = g.coefficients([p])[0]
             print 'bp = %s'%bp
             if m > 0:
                 return [(1,1),(-bp,p)]
@@ -169,7 +169,7 @@ class TwistedNewform(object):
         else:
             g, phi = self.newform()
             m = g.level().valuation(p)
-            bp = list(g.qexp(p+1))[-1]
+            bp = g.coefficients([p])[0]
             if m == 2:
                 return [(1,1)]
             elif m == 1:
