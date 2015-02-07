@@ -19,7 +19,7 @@ class TwistedNewform(object):
         return the character of the twisted form. Note that we assumed f has trivial
         character. Then the result should be chi^2
         """
-        return self.chi**2
+        return (self.chi**2).primitive_character()
 
     def newform(self):
         """
@@ -88,6 +88,45 @@ class TwistedNewform(object):
         k = self.f.weight()
         return 2*CuspForms(N,k).dimension()
 
+    def _expansion_data(self):
+        """
+        The helper function used in expansion_data
+        returns a list of tuples (c,d)
+        such that f_chi = \sum c_ig(q^d_i).
+        """
+        g,_ = self.newform()
+        M = self.chi.level()
+        print 'N, M = %s, %s'%(self.N,M)
+        v = M.prime_divisors()
+        if len(v) > 1:
+            raise NotImplementedError
+        p = v[0]
+
+        m = g.level().valuation(p)
+        n = self.f.level().valuation(p)
+
+        # simplest case: twist is a newform.
+        if m == n:
+            return [(1,1)]
+
+
+        else:
+            # second case where twist has non-trivial p-level
+            # f_chi = g - ap(g)*g|B_p
+            bp = list(g.qexp(p+1))[-1]
+            print 'bp = %s'%bp
+            if m > 0:
+                return [(1,1),(-bp,p)]
+
+            # Last case, where twist has level not-divisible by p.
+            # f_chi = g + a_p(g)g|B_p + chi^2(p)pg|B_p^2
+            else: # m = 0
+                chisquare = self.character()
+                if chisquare.conductor() > 1:
+                    raise ValueError('This is impossible.')
+                else:
+                    return [(1,1),(-bp,p),(p,p^2)]
+
 
     def expansion_data(self):
         """
@@ -95,14 +134,42 @@ class TwistedNewform(object):
         representing the expansion of f|W_NR_\chi(p)W_N.
         (c,d) such that
         f|W_N R_\chi(p) W_N. = w(f)w(g_chi)* \sum c_i\bar(g(q^d_i))
+
+        New content: now I modify it to work for prime power.
+        i.e. the expansion data for
+            f|W_NR_\chi(M)W_N
+        where M is a prime power. Note that we can get M by chi.level() # not chi.conductor()!!
+
         """
-        p = self.Q
-        if p == 1:
-            return (1,1)
+        M = chi.level()
+        print 'M = %s'%M
+        v = M.prime_divisors()
+        if len(v) > 1:
+            raise NotImplementedError
+
+        p = v[0]
+        condchi = self.Q # conductor of chi.
+
+        # First we use delaunay's formula to deal with the degenerate case
+        # where condchi is trivial.
+        if condchi == 1:
+            if M.valuation(p) >= 2:
+                return [(0,1)] # 0
+            else:
+                return [(-1,1)] # -f
+
+        # Now we deal with the second degenerate case, where
+        # condchi = p^a, M = p^b, and a < b.
+        if condchi < M:
+            return [(0,1)] # zero. Note I can only show this works for Gamma0(N) newforms.
+            # However, by commutativity, I can move a non-primitive sum to front and
+            # always get zero.
+
+        # The standard case, where M = cond(chi).
         else:
             g, phi = self.newform()
             m = g.level().valuation(p)
-            bp = g.qexp(p+1)[-1]
+            bp = list(g.qexp(p+1))[-1]
             if m == 2:
                 return [(1,1)]
             elif m == 1:
