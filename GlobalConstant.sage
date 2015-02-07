@@ -4,8 +4,15 @@ def generate_points(N,number_of_points = 10):
     """
     return some random points on the arc |z| = 1/sqrt(N), im(z) > 0.
     """
-    thetas = [0.4*random() + 0.1 for _ in range(number_of_points)]
-    zs = [CC(1/sqrt(N))*CC(e**(CC(pi)*CC(I)*theta)) for theta in thetas]
+    try:
+        N = ZZ(N)
+    except Exception:
+        print N.parent()
+
+    thetas = [CC(0.4*random() + 0.1) for _ in range(number_of_points)]
+    verbose('thetas computed')
+    print N.parent()
+    zs = [CC(1/sqrt(N))*CC(exp(CC(pi)*CC(I)*theta)) for theta in thetas]
     return zs
 
 
