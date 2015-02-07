@@ -14,6 +14,13 @@ class TwistedNewform(object):
     def __repr__(self):
         return 'Twist of Newform %s by chi = %s'%(self.f.elliptic_curve().label(),self.chi)
 
+    def character(self):
+        """
+        return the character of the twisted form. Note that we assumed f has trivial
+        character. Then the result should be chi^2
+        """
+        return self.chi**2
+
     def newform(self):
         """
         returns a tuple(g,phi)
@@ -108,6 +115,9 @@ class TwistedNewform(object):
         return FormalSum([(CC(a),'B%s'%b) for a,b in lst],CC)
 
     def al_eigenvalue(self):
+        """
+        return the atkin-lehner eigenvalue of the original(untwisted) form.
+        """
         return self.f.atkin_lehner_eigenvalue()
 
     def pseudo_eigenvalue(self):
