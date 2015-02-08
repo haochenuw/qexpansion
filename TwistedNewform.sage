@@ -94,10 +94,15 @@ class TwistedNewform(object):
         returns a list of tuples (c,d)
         such that f_chi = \sum c_ig(q^d_i).
         """
+        Q = self.chi.conductor()
+        if Q == 1:
+            return [(1,1)]
+
         g,_ = self.newform()
-        M = self.chi.level()
-        print 'N, M = %s, %s'%(self.N,M)
-        v = M.prime_divisors()
+
+        v = Q.prime_divisors()
+
+        # check that the conductor is a prime power.
         if len(v) > 1:
             raise NotImplementedError
         p = v[0]
@@ -127,29 +132,69 @@ class TwistedNewform(object):
                 else:
                     return [(1,1),(-bp,p),(p,p^2)]
 
+    def _const(self,M):
+        """
+        return the constant c_{chi,M} such that
+        f|R_chi(M) = c_{chi,M} f_chi.
+        where M = some prime power divisible by cond(chi). We assume M > 1.
+        """
+        Q = self.chi.conductor()
+        if M % Q:
+            raise ValueError('The conductor of chi must divide M.')
 
-    def expansion_data(self):
+        v = M.prime_divisors()
+
+        # check that M is a prime power.
+        if len(v) > 1:
+            raise NotImplementedError
+
+        p = v[0]
+        d = M.valuation(p)
+
+        if Q == 1: # chi is trivial.
+            if d == 1:
+                return -1
+            else: return 0
+        elif Q < M:
+                return 0 # use the fact that ord_p(N_f) >= 2 => a(pn) = 0 for all n.
+        else:
+            # the standard cse where M = cond(chi).
+            # Then f|R_chi(M) = g(\chibar)f_chi
+            return chi.bar().gauss_sum()
+
+
+
+    def expansion_data(self,M):
         """
         return a FormalSum
-        representing the expansion of f|W_NR_\chi(p)W_N.
+        representing the expansion of f|W_NR_\chi(M)W_N.
         (c,d) such that
-        f|W_N R_\chi(p) W_N. = w(f)w(g_chi)* \sum c_i\bar(g(q^d_i))
+        f|W_N R_\chi(M) W_N. = w(f)w(g_chi)* \sum (c_i * \bar(g(q^d_i)))
 
         New content: now I modify it to work for prime power.
         i.e. the expansion data for
             f|W_NR_\chi(M)W_N
-        where M is a prime power. Note that we can get M by chi.level() # not chi.conductor()!!
+        where M is a prime power.
 
         """
-        M = chi.level()
         print 'M = %s'%M
         v = M.prime_divisors()
         if len(v) > 1:
             raise NotImplementedError
 
         p = v[0]
-        condchi = self.Q # conductor of chi.
+        Q = self.chi.conductor() # conductor of chi.
+        if M % Q:
+            raise ValueError('Conductor of chi must divide M')
 
+        N = self.N
+        c = self._const(M)
+
+        Ng = self.newform()[0].level()
+        return [(c*coeff*QQ(N/(Ng*degree**2)),ZZ(N/(degree*Ng))) for coeff,degree in self._expansion_data()]
+
+
+        """
         # First we use delaunay's formula to deal with the degenerate case
         # where condchi is trivial.
         if condchi == 1:
@@ -160,7 +205,7 @@ class TwistedNewform(object):
 
         # Now we deal with the second degenerate case, where
         # condchi = p^a, M = p^b, and a < b.
-        if condchi < M:
+        elif condchi < M:
             return [(0,1)] # zero. Note I can only show this works for Gamma0(N) newforms.
             # However, by commutativity, I can move a non-primitive sum to front and
             # always get zero.
@@ -176,10 +221,11 @@ class TwistedNewform(object):
                 return [(CC(-bp/p), 1),(p,p)]
             elif m == 0:
                 return [(CC(1/p),1),(-bp,p),(p^2,p^2)]
+        """
 
-    def expansion_string(self):
-        lst = self.expansion_data()
-        return FormalSum([(CC(a),'B%s'%b) for a,b in lst],CC)
+    #def expansion_string(self,M):
+    #    lst = self.expansion_data(M)
+    #    return '+'.join([str(CC(a)) +'* B%s'%b for a,b in lst])
 
     def al_eigenvalue(self):
         """
@@ -189,33 +235,52 @@ class TwistedNewform(object):
 
     def pseudo_eigenvalue(self):
         g,phi = self.newform()
+        #First we deal with some easy cases:
+        if g.character().conductor() == 1: # twist is on Gamma0(N).
+            return g.atkin_lehner_eigenvalue()
+
         return global_constant(g,phi)
 
-    def expansion(self,terms):
+    def expansion(self,M,terms = 15):
         """
-        returns the numerical q-expansion of f|W_NR_chiW_N
+        returns the numerical q-expansion of f|W_NR_chi(M)W_N
         """
+        c = self._const(M)
+        if c == 0:
+            verbose("Get zero")
+            return 0
+
+        # computing the constants in front,
         chi = self.chi.primitive_character()
         chibar = chi.bar()
-        gauss = chibar.gauss_sum_numerical()
+        # gauss = chibar.gauss_sum_numerical()
         wf = self.al_eigenvalue()
         wg = self.pseudo_eigenvalue()
-        const = wf*wg*gauss
-        print 'const = %s'%const
-        result = []
-        v = self.expansion_data()
-        max_degree = max([d for c,d in v])
-        print 'max degree = %s'%max_degree
+        alconst = wf*wg
+        print 'alconst = %s'%alconst
+
+
+        # computing the q-expansion of gbar
         g,phi = self.newformdata
-        gg = g.qexp(terms*max_degree)
-        vggp = list(gg.polynomial())
-        vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
+        gg = g.qexp(terms+10)
+
+        q = gg.parent().gen()
+        #vggp = list(gg.polynomial())
+        #vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
+
+        # add up the result
+        v = self.expansion_data(M)
+        print 'expansion data = %s'%v
         result = [0 for _ in range(terms)]
-        for c, d in v:
-            newcoeffs = vggpC[::ZZ(d)][:terms]
-            result = [a+c*b for a,b in zip(result,newcoeffs)]
+        for coeff, d in v:
+            ggd = gg(q = q^d)
+            vggp = list(ggd.polynomial())
+            vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
+
+            newcoeffs = vggpC[:terms]
+            result = [a+CC(coeff)*b for a,b in zip(result,newcoeffs)]
         q = var('q')
-        return CC[[q]]([const*t for t in vggpC]).add_bigoh(terms)
+        return CC(alconst)*CC[[q]](result).add_bigoh(terms)
 
 
 
