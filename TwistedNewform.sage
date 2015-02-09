@@ -34,8 +34,9 @@ class TwistedNewform(object):
         chi = self.chi
         Q = self.Q
         if Q == 1:
-            print 'twist is trivial'
-            return (f,QQ.embeddings(QQ)[0])
+            verbose('twist is trivial')
+            self.newformdata = (f,QQ.embeddings(QQ)[0])
+            return self.newformdata
 
         B = self.B_bound()
         verbose('B-bound = %s'%B)
@@ -160,7 +161,7 @@ class TwistedNewform(object):
         else:
             # the standard cse where M = cond(chi).
             # Then f|R_chi(M) = g(\chibar)f_chi
-            return chi.bar().gauss_sum()
+            return self.chi.bar().gauss_sum()
 
 
 
@@ -261,7 +262,7 @@ class TwistedNewform(object):
 
 
         # computing the q-expansion of gbar
-        g,phi = self.newformdata
+        g,phi = self.newform()
         gg = g.qexp(terms+10)
 
         q = gg.parent().gen()

@@ -3,19 +3,16 @@ load('TwistedNewform.sage')
 
 class QExpComputer(object):
 
-    def __init__(self,E,p):
+    def __init__(self,E,d):
         #if not isinstance(E,EllipticCurve):
         #    raise ValueError('The first argument must be an elliptic curve')
         self.E = E
-        self.p = p
+        self.d = d
         self.N = E.conductor()
-        if not is_prime_power(p):
-            raise ValueError('the second argument must be a prime power.')
-        elif self.N % p:
-            raise ValueError('the second argument must divide the conductor of E.')
-        if not is_prime(p) and p >= 5 and self.N.valuation(p) == 2:
-            raise NotImplementedError
-
+        if not is_prime_power(d):
+            raise NotImplementedError('the second argument must be a prime power.')
+        elif self.N % (d^2):
+            raise ValueError('the second argument squared must divide the conductor of E.')
         self.f = E.modular_form()
 
     def __repr__(self):
@@ -25,50 +22,47 @@ class QExpComputer(object):
         return self.E
 
     def denom(self):
-        return self.N // self.p
+        return self.N // self.d
 
     def characters(self):
         """
         return the set of Dirichlet characters of modulus N with conductor dividing p,
         which is relevant of the computation of expansions.
         """
-        return [chi for chi in list(DirichletGroup(self.p)) if chi.conductor() > 1]
+        return [chi for chi in list(DirichletGroup(self.d))]
 
-    def _expansion_data(self):
-        """
-        get the information at each chi
-        """
-        result =[]
-        for chi in self.characters():
-            if chi.conductor() == p: # non-trivial conductor
-                Tchi = TwistedNewform(self.f,chi)
-                result.append((Tchi.constant(),Tchi.newform()))
-        return result
+    #def _expansion_data(self):
+    #    """
+    #    get the information at each chi
+    #    """
+    #    result =[]
+    #    for chi in self.characters():
+    #        Tchi = TwistedNewform(self.f,chi)
+    #        result.append((Tchi.constant(),Tchi.newform()))
+    #    return result
 
-    def expansion_numerical(self,numerator = -1,terms = 20,prec = 53):
+    def expansion_numerical(self,numerator = 1,terms = 15,prec = 53):
         """
-        return the first (terms) term of the q-expansion of self.f at the cusp numerator/self.denom().
-        The detault numerator is -1.
-        only implemented when self.p = p is a prime and v_p(N) == 2.
+        return the first (terms) terms of the q-expansion of self.f at the cusp numerator/self.denom().
+        The detault numerator is 1.
+        only implemented when self.d = d is a prime power.
         """
         f = self.f
-        p = self.p
+        d = self.d
         N = self.N
         a = numerator
 
         C = ComplexField(prec)
         q = var('q')
 
-        result = -f.qexp(terms)
-        verbose('result = %s'%result)
+        result = CC[[q]](0)
         for chi in self.characters():
             verbose('chi = %s'%chi)
             Tchi = TwistedNewform(self.f,chi)
-
-            exp_chi = Tchi.expansion(terms)
+            exp_chi = Tchi.expansion(d,terms)
             verbose('exp_chi = %s'%exp_chi)
             result += exp_chi*CC(chi(-a))
-        return result/euler_phi(p)
+        return result/euler_phi(d)
 
 
 
