@@ -25,11 +25,13 @@ To use these codes, it's advised that you have a sagemathcloud project.
 
 1. Clone this repository.
 (In your project, do the following):
+
         git clone https://github.com/haochenuw/qexpansion
 
 2. Create a worksheet.
 
 3. Load the main file.
+
         load('QExpComputer.sage')
 
 ###3. Example.
@@ -47,6 +49,7 @@ We use the class "QExpComputer" to compute expansions. It takes an elliptic curv
     We see these two expansions match up. Note that the default option computes up to $q^{15}$, but one can change the keyword 'terms' to get arbitrary number of terms.
 
 2. As a second exmple, we compute with the curve '48a' and cusp $z = 1/12$, the smallest power of $q$ in this  expansion is known to be $q^2$.
+
         sage: E = EllipticCurve('48a);
         sage: Comp = QExpComputer(E,4)
         sage: Comp.expansion_numerical(terms=20)
