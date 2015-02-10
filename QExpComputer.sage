@@ -54,6 +54,8 @@ class QExpComputer(object):
             exp_chi = Tchi.expansion(d,terms)
             verbose('exp_chi = %s'%exp_chi)
             result += exp_chi*CC(chi(-a))
+
+
         return result/euler_phi(d)
 
 
