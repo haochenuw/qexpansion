@@ -1,17 +1,14 @@
 load('TwistedNewform.sage')
 
 
+
 class QExpComputer(object):
 
     def __init__(self,E,d):
-        #if not isinstance(E,EllipticCurve):
-        #    raise ValueError('The first argument must be an elliptic curve')
         self.E = E
         self.d = d
         self.N = E.conductor()
-        if not is_prime_power(d):
-            raise NotImplementedError('the second argument must be a prime power.')
-        elif self.N % (d^2):
+        if self.N % (d^2):
             raise ValueError('the second argument squared must divide the conductor of E.')
         self.f = E.modular_form()
 
@@ -26,31 +23,26 @@ class QExpComputer(object):
 
     def characters(self):
         """
-        return the set of Dirichlet characters of modulus N with conductor dividing p,
-        which is relevant of the computation of expansions.
+        return the set of Dirichlet characters of modulus d with
+        cond'(chi) == d in the sense of Winnie Li's twist paper.
         """
-        return [chi for chi in list(DirichletGroup(self.d))]
+        return [chi for chi in list(DirichletGroup(self.d)) if conductor_prime(chi) == self.d]
 
-    #def _expansion_data(self):
-    #    """
-    #    get the information at each chi
-    #    """
-    #    result =[]
-    #    for chi in self.characters():
-    #        Tchi = TwistedNewform(self.f,chi)
-    #        result.append((Tchi.constant(),Tchi.newform()))
-    #    return result
 
     def expansion_numerical(self,numerator = 1,terms = 15,prec = 53):
         """
-        return the first (terms) terms of the q-expansion of self.f at the cusp numerator/self.denom().
-        The detault numerator is 1.
-        only implemented when self.d = d is a prime power.
+        return the first (terms) terms of the q-expansion of self.f at the cusp
+        c = numerator/self.denom(). The default numerator is 1.
         """
         f = self.f
         d = self.d
-        N = self.N
-        a = numerator
+        if gcd(numerator,self.denom()) > 1:
+            raise ValueError('numerator must be coprime to the cusp denom.')
+        try:
+            numerator = ZZ(numerator)
+        except:
+            raise ValueError('numerator must be an integer.')
+        a = numerator.inverse_mod(self.denom())
 
         C = ComplexField(prec)
         q = var('q')
@@ -58,7 +50,7 @@ class QExpComputer(object):
         result = CC[[q]](0)
         for chi in self.characters():
             verbose('chi = %s'%chi)
-            Tchi = TwistedNewform(self.f,chi)
+            Tchi = TwistedNewform(f,chi)
             exp_chi = Tchi.expansion(d,terms)
             verbose('exp_chi = %s'%exp_chi)
             result += exp_chi*CC(chi(-a))

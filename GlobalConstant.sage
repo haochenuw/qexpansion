@@ -11,7 +11,6 @@ def generate_points(N,number_of_points = 10):
 
     thetas = [CC(0.4*random() + 0.1) for _ in range(number_of_points)]
     verbose('thetas computed')
-    print N.parent()
     zs = [CC(1/sqrt(N))*CC(exp(CC(pi)*CC(I)*theta)) for theta in thetas]
     return zs
 

@@ -22,7 +22,7 @@ class KnOperator(object):
         return self.f.character()
 
 
-    def kn_polynomial(self):
+    def polynomial(self):
         try:
             K = self.f.hecke_eigenvalue_field()
         except:
@@ -40,12 +40,20 @@ class KnOperator(object):
             result *= factor
         return result
 
-    def expansion_data(self):
-        P = self.kn_polynomial()
+    def exp_data(self):
+        P = self.polynomial()
         vn = (self.n).prime_factors()
         result = []
-        for a in P.monomials():
-            coeff = P.monomial_coefficient(a)
-            verbose('a = %s'%a)
-            result.append((coeff,a(vn)))
+
+        if len(P.parent().gens()) >= 2:
+            for a in P.monomials():
+                coeff = P.monomial_coefficient(a)
+                result.append((coeff,a(vn)))
+        elif len(P.parent().gens()) == 1: # a univariate polynomial.
+            w = P.coefficients()
+            p = vn[0]
+            for j in range(len(w)):
+                result.append((w[j],p**j))
+        else: # The really degenerate case, where self.n == 1
+            return [(1,1)]
         return result

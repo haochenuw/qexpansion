@@ -1,4 +1,6 @@
 load('GlobalConstant.sage')
+load('Decompose-Characters.sage')
+load('KnOperator.sage')
 
 class TwistedNewform(object):
 
@@ -91,9 +93,11 @@ class TwistedNewform(object):
 
     def _expansion_data(self):
         """
+        Warning: Do not need this anymore.
         The helper function used in expansion_data
         returns a list of tuples (c,d)
-        such that f_chi = \sum c_ig(q^d_i).
+        such that f_chi = \sum c_ig(q^d_i), where g is the newform
+        associated to f_chi.
         """
         Q = self.chi.conductor()
         if Q == 1:
@@ -120,7 +124,6 @@ class TwistedNewform(object):
             # second case where twist has non-trivial p-level
             # f_chi = g - ap(g)*g|B_p
             bp = g.coefficients([p])[0]
-            print 'bp = %s'%bp
             if m > 0:
                 return [(1,1),(-bp,p)]
 
@@ -133,17 +136,112 @@ class TwistedNewform(object):
                 else:
                     return [(1,1),(-bp,p),(p,p^2)]
 
+    def _delaunay_factors(self,M):
+        """
+        return chi', c, such that f|R_chi(M) = c f_chi'.
+        We require that cond'(chi) = M.
+        Use Delaunay's formula on page 74.
+        """
+        chi = self.chi
+        Mchi = chi.modulus()
+        if M % Mchi:
+            raise ValueError('Mchi must divide M.')
+        if conductor_prime(chi) != M:
+            raise ValueError('cond \' (chi) must equal M')
+        chi = chi.extend(M)
+        chint = factorization(chi) # loaded function from DC.sage
+
+        # use chint to obtain info on tr, and ...
+        nt = chint.modulus()
+        tr = ZZ(M // nt)
+        i = len(tr.prime_divisors())
+        if nt > 1: # if chint is not the trivial character
+            return (chint, CC((-1)**i*chint(tr)*chint.bar().gauss_sum_numerical()))
+        else: # if chint is the trivial character. We need to separate out this case
+        # because the gauss sum for trivial character modulo 1 in sage is 0 (?) but I want it to be 1.
+            return (chint, (-1)**i)
+
+
+    def _expansion_data_comp(self):
+        """
+        Replaces _expansion_data. Work for composite modulus.
+        Let g be the twisted newform associated to self.
+        Returns a list of tuples (c_j,d_j) such that
+        f_chi = f_chint = \sum_j c_j g(q^d_j) = g|K_n.
+        """
+        Kn = self._kn()
+        verbose('Kn computed')
+        return Kn.exp_data()
+
+    def _kn(self):
+        chint,_ = self._delaunay_factors(self.chi.modulus())
+        n = chint.modulus().radical()
+        g,_ = self.newform()
+        return KnOperator(g,n)
+
+    def expansion_data_comp(self):
+        """
+        Returns a list of tuples (c,d) such that
+        representing the expansion of f|W_NR_\chi(M)W_N.
+
+        f|W_N R_\chi(M) W_N.
+                             = A * f_chi |W_N
+                             = A * \sum (c_i * \bar(g(q^d_i)))
+        """
+        N = self.f.level()
+        Ng = self.newform()[0].level()
+        return [(coeff*QQ(N/(Ng*degree**2)),ZZ(N/(degree*Ng))) for coeff,degree in self._expansion_data_comp()]
+
+    def constant(self,M):
+        """
+        returns the constant A mentioned in expansion_data_comp
+        """
+        # return w(f)w(g)*(the second output of delaunay_factors)
+        wf = self.al_eigenvalue()
+        wg = self.pseudo_eigenvalue()
+        alconst = wf*wg
+        verbose('alconst = %s'%alconst)
+        delaunayconst = self._delaunay_factors(M)[1]
+        return alconst*delaunayconst
+
     def _const(self,M):
         """
+        Being replaced by _delaunay_factors.
         return the constant c_{chi,M} such that
         f|R_chi(M) = c_{chi,M} f_chi.
         where M = some prime power divisible by cond(chi). We assume M > 1.
         """
-        Q = self.chi.conductor()
-        if M % Q:
-            raise ValueError('The conductor of chi must divide M.')
+        chi = self.chi
+        Mchi = chi.modulus()
 
+        if M % Mchi:
+            raise ValueError('M must be divisible by the modulus of chi')
+
+        chi = chi.extend(M)
+        Q = chi.conductor()
+
+        vchi = chi.decomposition()
+        result = 1
+
+        vchi_nondegenerate = []
+        # first we deal with some degeneracies
+        for chip in vchi:
+            mod = chip.modulus()
+            cond = chip.conductor()
+            if 1 < cond and cond < mod:
+                return 0
+            elif cond == 1:
+                if not mod.is_prime():
+                    return 0
+                else:
+                    result *= -1
+            else: # conductor = modulus
+                result *= chip.bar().gauss_sum()
+        # Delaunay's other constants should also be taken into account!!!
+        # Why don't I use Delaunay's formula??
         v = M.prime_divisors()
+
+
 
         # check that M is a prime power.
         if len(v) > 1:
@@ -167,7 +265,6 @@ class TwistedNewform(object):
 
     def expansion_data(self,M):
         """
-        return a FormalSum
         representing the expansion of f|W_NR_\chi(M)W_N.
         (c,d) such that
         f|W_N R_\chi(M) W_N. = w(f)w(g_chi)* \sum (c_i * \bar(g(q^d_i)))
@@ -244,44 +341,42 @@ class TwistedNewform(object):
 
     def expansion(self,M,terms = 15):
         """
-        returns the numerical q-expansion of f|W_NR_chi(M)W_N
+        returns the numerical q-expansion of f|W_NR_chi(M)W_N.
         """
-        c = self._const(M)
-        if c == 0:
-            verbose("Get zero")
+        chi = self.chi
+
+        # Degenerate case first.
+        if M != conductor_prime(chi):
+            verbose('in the zero case')
             return 0
 
+
         # computing the constants in front,
-        chi = self.chi.primitive_character()
-        chibar = chi.bar()
-        # gauss = chibar.gauss_sum_numerical()
-        wf = self.al_eigenvalue()
-        wg = self.pseudo_eigenvalue()
-        alconst = wf*wg
-        print 'alconst = %s'%alconst
+        const = self.constant(M)
 
-
+        verbose('const = %s'%const)
         # computing the q-expansion of gbar
         g,phi = self.newform()
         gg = g.qexp(terms+10)
-
         q = gg.parent().gen()
         #vggp = list(gg.polynomial())
         #vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
 
         # add up the result
-        v = self.expansion_data(M)
-        print 'expansion data = %s'%v
+        v = self.expansion_data_comp()
+
+        verbose('v = %s'%v)
+
+
         result = [0 for _ in range(terms)]
         for coeff, d in v:
             ggd = gg(q = q^d)
             vggp = list(ggd.polynomial())
             vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
-
             newcoeffs = vggpC[:terms]
             result = [a+CC(coeff)*b for a,b in zip(result,newcoeffs)]
         q = var('q')
-        return CC(alconst)*CC[[q]](result).add_bigoh(terms)
+        return CC(const)*CC[[q]](result).add_bigoh(terms)
 
 
 
