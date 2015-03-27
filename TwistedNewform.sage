@@ -23,6 +23,21 @@ class TwistedNewform(object):
         """
         return (self.chi**2).primitive_character()
 
+    def is_minimal(self):
+        """
+        self is associated to an elliptic curve.
+        """
+        Q = self.Q
+        if not is_prime(Q):
+            raise ValueError('conductor of the twisting character must be prime.')
+        from sage.modular.local_comp.type_space import TypeSpace
+        from sage.modular.modform.element import Newform
+        E = self.f.elliptic_curve()
+        fnew = Newform(CuspForms(E.conductor()), E.modular_symbol_space(),'a')
+        T = TypeSpace(fnew,Q)
+        return T.is_minimal()
+
+
     def newform(self):
         """
         returns a tuple(g,phi)
@@ -49,26 +64,43 @@ class TwistedNewform(object):
 
         chi = chi.primitive_character()
         Kchi = chi.base_ring()
+        name = 'chi'
+        for a in chi.element():
+            name += str(a)
+
+        # the coprime part
+        Nprime = N//gcd(N,Q)
+        print 'Nprime = %s'%Nprime
+
         for M in N.divisors():
-            if M % Q1 == 0:
+            if M % (lcm(Q1,Nprime)) == 0:
                 verbose('Working on level M = %s'%M)
-                glist = CuspForms(chisquare.extend(M),2).newforms('a')
+                glist = CuspForms(chisquare.extend(M),2).newforms('a'+name+'M%s'%M)
+                verbose('Number of conjugacy classes of newforms on level %s is %s'%(M,len(list(glist))))
                 for g in glist:
-                    verbose('Working with one g = %s'%g)
+                    verbose('Working with the newform g = %s'%g)
                     Kg = g.base_ring()
-                    v = Kg.embeddings(Kchi)
+                    if Kg is not QQ:
+                        L = Kg.absolute_field('c')
+                        from_L, to_L = L.structure()
+                    else:
+                        L = Kg
+                        to_L = Kg.embeddings(QQ)[0]
+                    v = L.embeddings(Kchi)
+
                     if len(v) > 0:
                         gqB  = list(g.qexp(B+10))
                         for phi in v:
                             verbose('phi = %s'%phi)
-                            if all([phi(gqB[n]) == fqB[n]*chi(n) for n in range(1,B+1) if gcd(n,Q) == 1]):
-                                verbose('all checked out')
+                            if all([phi(to_L(gqB[n])) == fqB[n]*chi(n) for n in range(1,B+1) if gcd(n,Q) == 1]):
+                                verbose('found the twisted newform.')
                                 self.newformdata = (g,phi) # save the result
                                 return (g,phi)
 
-        raise ValueError('newform not found! Please debug.')
+        raise ValueError('newform not found for chi = %s! Please debug.'%self.chi)
 
     def numerical_global_constant(self):
+        # deprecated method. should be deleted.
         chisquare = (self.chi)**2
         if chisquare.conductor() == 1: # the twist is again a form on Gamma0(N)
             return self.f.atkin_lehner_eigenvalue()
@@ -93,7 +125,7 @@ class TwistedNewform(object):
 
     def _expansion_data(self):
         """
-        Warning: Do not need this anymore.
+        Warning: deprecated. Do not need this anymore.
         The helper function used in expansion_data
         returns a list of tuples (c,d)
         such that f_chi = \sum c_ig(q^d_i), where g is the newform
@@ -132,22 +164,25 @@ class TwistedNewform(object):
             else: # m = 0
                 chisquare = self.character()
                 if chisquare.conductor() > 1:
-                    raise ValueError('This is impossible.')
+                    raise ValueError('This is impossible. Please debug.')
                 else:
                     return [(1,1),(-bp,p),(p,p^2)]
 
-    def _delaunay_factors(self,M):
+    def _delaunay_factors(self,M,prec = 53):
         """
         return chi', c, such that f|R_chi(M) = c f_chi'.
         We require that cond'(chi) = M.
         Use Delaunay's formula on page 74.
         """
+
         chi = self.chi
         Mchi = chi.modulus()
         if M % Mchi:
             raise ValueError('Mchi must divide M.')
         if conductor_prime(chi) != M:
             raise ValueError('cond \' (chi) must equal M')
+
+        C = ComplexField(prec)
         chi = chi.extend(M)
         chint = factorization(chi) # loaded function from DC.sage
 
@@ -156,7 +191,7 @@ class TwistedNewform(object):
         tr = ZZ(M // nt)
         i = len(tr.prime_divisors())
         if nt > 1: # if chint is not the trivial character
-            return (chint, CC((-1)**i*chint(tr)*chint.bar().gauss_sum_numerical()))
+            return (chint, C((-1)**i*chint(tr)*chint.bar().gauss_sum_numerical()))
         else: # if chint is the trivial character. We need to separate out this case
         # because the gauss sum for trivial character modulo 1 in sage is 0 (?) but I want it to be 1.
             return (chint, (-1)**i)
@@ -170,7 +205,6 @@ class TwistedNewform(object):
         f_chi = f_chint = \sum_j c_j g(q^d_j) = g|K_n.
         """
         Kn = self._kn()
-        verbose('Kn computed')
         return Kn.exp_data()
 
     def _kn(self):
@@ -187,25 +221,27 @@ class TwistedNewform(object):
         f|W_N R_\chi(M) W_N.
                              = A * f_chi |W_N
                              = A * \sum (c_i * \bar(g(q^d_i)))
+
         """
         N = self.f.level()
         Ng = self.newform()[0].level()
         return [(coeff*QQ(N/(Ng*degree**2)),ZZ(N/(degree*Ng))) for coeff,degree in self._expansion_data_comp()]
 
-    def constant(self,M):
+    def constant(self,M,prec = 53):
         """
         returns the constant A mentioned in expansion_data_comp
         """
         # return w(f)w(g)*(the second output of delaunay_factors)
         wf = self.al_eigenvalue()
-        wg = self.pseudo_eigenvalue()
+        wg = self.pseudo_eigenvalue(prec = prec)
         alconst = wf*wg
         verbose('alconst = %s'%alconst)
-        delaunayconst = self._delaunay_factors(M)[1]
+        delaunayconst = self._delaunay_factors(M,prec = prec)[1]
         return alconst*delaunayconst
 
     def _const(self,M):
         """
+        deprecated.
         Being replaced by _delaunay_factors.
         return the constant c_{chi,M} such that
         f|R_chi(M) = c_{chi,M} f_chi.
@@ -265,6 +301,7 @@ class TwistedNewform(object):
 
     def expansion_data(self,M):
         """
+        WARNING: DEPRECATED. USE EXPANSION_DATA_COMP INSTEAD.
         representing the expansion of f|W_NR_\chi(M)W_N.
         (c,d) such that
         f|W_N R_\chi(M) W_N. = w(f)w(g_chi)* \sum (c_i * \bar(g(q^d_i)))
@@ -321,9 +358,6 @@ class TwistedNewform(object):
                 return [(CC(1/p),1),(-bp,p),(p^2,p^2)]
         """
 
-    #def expansion_string(self,M):
-    #    lst = self.expansion_data(M)
-    #    return '+'.join([str(CC(a)) +'* B%s'%b for a,b in lst])
 
     def al_eigenvalue(self):
         """
@@ -331,30 +365,31 @@ class TwistedNewform(object):
         """
         return self.f.atkin_lehner_eigenvalue()
 
-    def pseudo_eigenvalue(self):
+    def pseudo_eigenvalue(self,prec = 53):
         g,phi = self.newform()
         #First we deal with some easy cases:
         if g.character().conductor() == 1: # twist is on Gamma0(N).
             return g.atkin_lehner_eigenvalue()
 
-        return global_constant(g,phi)
+        return global_constant(g,phi,prec = prec)
 
-    def expansion(self,M,terms = 15):
+    def expansion(self,M,terms = 15,prec = 53):
         """
         returns the numerical q-expansion of f|W_NR_chi(M)W_N.
         """
         chi = self.chi
+
 
         # Degenerate case first.
         if M != conductor_prime(chi):
             verbose('in the zero case')
             return 0
 
+        C = ComplexField(prec)
 
         # computing the constants in front,
         const = self.constant(M)
 
-        verbose('const = %s'%const)
         # computing the q-expansion of gbar
         g,phi = self.newform()
         gg = g.qexp(terms+10)
@@ -362,10 +397,11 @@ class TwistedNewform(object):
         #vggp = list(gg.polynomial())
         #vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
 
-        # add up the result
+        # add up the result. V contains the constants plus the B_p information.
         v = self.expansion_data_comp()
 
         verbose('v = %s'%v)
+
 
 
         result = [0 for _ in range(terms)]
@@ -374,9 +410,9 @@ class TwistedNewform(object):
             vggp = list(ggd.polynomial())
             vggpC = [phi(a).conjugate() for a in vggp] # Don't forget to take complex conjugate!
             newcoeffs = vggpC[:terms]
-            result = [a+CC(coeff)*b for a,b in zip(result,newcoeffs)]
+            result = [a+C(coeff)*b for a,b in zip(result,newcoeffs)]
         q = var('q')
-        return CC(const)*CC[[q]](result).add_bigoh(terms)
+        return C(const)*C[[q]](result).add_bigoh(terms)
 
 
 

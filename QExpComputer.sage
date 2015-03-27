@@ -47,13 +47,13 @@ class QExpComputer(object):
         C = ComplexField(prec)
         q = var('q')
 
-        result = CC[[q]](0)
+        result = C[[q]](0)
         for chi in self.characters():
-            verbose('chi = %s'%chi)
+            verbose('working with Dirichlet character chi = %s'%chi)
             Tchi = TwistedNewform(f,chi)
-            exp_chi = Tchi.expansion(d,terms)
-            verbose('exp_chi = %s'%exp_chi)
-            result += exp_chi*CC(chi(-a))
+            exp_chi = Tchi.expansion(d,terms,prec = prec)
+            verbose('expansion from chi = %s'%exp_chi)
+            result += exp_chi*C(chi(-a))
 
 
         return result/euler_phi(d)

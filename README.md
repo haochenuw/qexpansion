@@ -12,11 +12,11 @@ $z$ such that z is equivalent to a cusp of form $[\frac{c}{d}]$,
 with $d \mid N$ and $N \mid d^2$.
 
 **Definition** Let $z$ be a big cusp of $\Gamma_0(N)$, take
-any matrix \alpha \in SL_2(\mathbb{Z}) with $\alpha(\infty) = z$. The
+any matrix $\alpha \in SL_2(\mathbb{Z})$ with $\alpha(\infty) = z$. The
 Fouier expansion of f at $z$ is defined as
-\[
+$$
     f(q;z) = f|[\alpha](q) = \sum_{n =1}^{\infty} a_n(f;z)q^n \in \mathbb{C}[[q]].
-\]
+$$
 The code in this project will compute the coefficients of $f(q;z)$ numerically.
 
 ###2. Preparations.

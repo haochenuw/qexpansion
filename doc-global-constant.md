@@ -24,14 +24,16 @@ g = q + a_{0}q^{2} - a_{0}q^{3} - q^{4} + \left(a_{0} - 2\right)q^{5} + O(q^{6})
 where $a_0 = \zeta_4$. Since the 5-th coefficient of g is nonzero, we can directly compute the global constant $w(g)$
 using [Winnie Li: Theorem 2.1], that
 \[
-    w(g) = \frac{\mathfrak{g}(\chi^2)}{a_q(g)}
+    w_5(g) = \frac{\mathfrak{g}(\chi^2)}{a_5(g)}
 \]
-,where $\mathfrak{g}$ denotes the Gauss sum function. Hence we computed
+
+,where $\mathfrak{g}$ denotes the Gauss sum function. Also we computed the root number of $f$ and 2 and 3 are -1 and -1. So
+they multiply to 1 and do not conflict with our result. Hence we computed
 
     sage: chi = DirichletGroup(5).0**2
     sage: g = Newforms(chi.extend(30),names = 'a')[0]
     sage: phi = g.base_ring().complex_embeddings()[1]
-    sage: chi0.gauss_sum_numerical()/phi(g.qexp(10)[5])
+    sage: chi.gauss_sum_numerical()/phi(g.qexp(10)[5])
     -0.894427190999916 - 0.447213595499958*I
     sage: global_constant(g,phi) # takes about 10 seconds.
     -0.894427190999916 - 0.447213595499958*I

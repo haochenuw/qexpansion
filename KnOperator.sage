@@ -1,9 +1,10 @@
 class KnOperator(object):
     """
-    The Kn operator acting on a newform
-    Kn = \prod p\mid n K_p, where
-
-    K_p = Id - U_pB_p.
+    The Kn operator acting on a newform.
+    Definition:
+            Kn = \prod_{p\mid n} K_p,
+    where
+            K_p = Id - U_pB_p.
     """
     def __init__(self,f,n):
         try:
@@ -32,7 +33,6 @@ class KnOperator(object):
         vn = n.prime_divisors()
         R = PolynomialRing(K,['B%s'%p for p in vn])
         variables = R.gens()
-        verbose('R = %s'%R)
         vf = self.f.padded_list(n+1)
         result = R(1)
         for i in range(len(vn)):
