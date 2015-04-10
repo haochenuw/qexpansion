@@ -22,43 +22,50 @@ def period(f,phi,a,b,terms = None, prec =53):
     return an approximation of the  integral \int_a^b f
     """
     if terms is None:
-        terms = prec*20 # Linear model is good, see William Stein, chow heegner paper.
-
-    f = f.q_expansion(terms)
+        terms = prec*50 # Linear growth is good, see William Stein: chow heegner paper.
+    try:
+        # if f is not a q-expansion.
+        f = f.q_expansion(terms)
+    except:
+        pass
     C = ComplexField(prec)
+
 
     ff = f.shift(-1).integral()
     v = list(ff.polynomial())
     K = v[0].parent()
     if K is not QQ:
-        #phi = K.complex_embeddings()[0]
         q = var('q')
         w = [phi(t) for t in v]
         ffpC = C[q](w)
     else:
-        verbose('field is rational')
-        ffpC = ff.polynomial()
+        q = var('q')
+        ffpC = C[q](ff.polynomial())
 
-    return ffpC.substitute(exp(2*C(pi)*C(I)*b)) - ffpC.substitute(exp(2*C(pi)*C(I)*a))
+    return ffpC.substitute(C(exp(2*C(pi)*C(I)*C(b)))) - ffpC.substitute(C(exp(2*C(pi)*C(I)*C(a))))
 
 
-def global_constant(f,phi, points = 5,prec = 53):
+def global_constant(f,phi,points = 5,prec = 53,terms = 1000,level = None):
     """
     f -- some newform on Gamma1(N) with coeff in number field K
     phi -- a complex embedding of K
     OUTPUT:
         w(f) -- the atkin-lehner pseudo-eigenvalue of f.
-        Or output fail.
+        Or fail.
     """
-    N = f.level()
-    pts = generate_points(N,number_of_points = points)
+    if level is None:
+        level = f.level()
+    # print 'f = %s'%f
+    pts = generate_points(level,number_of_points = points, prec= prec)
     results = []
+
+    terms = max(terms, prec*50)
 
     C = ComplexField(prec)
 
-    base_point = C(I/sqrt(N))
+    base_point = C(I/sqrt(level))
     for i in range(len(pts)):
-        c = period(f,phi,base_point,pts[i],prec = prec)
+        c = period(f,phi,base_point,pts[i],prec = prec,terms = terms)
         if abs(c) > 1e-3:
             results.append(c/c.conjugate())
     if len(results) == 0:
@@ -69,5 +76,5 @@ def global_constant(f,phi, points = 5,prec = 53):
         if std < 1e-3:
             return C(mean(results))
         else:
-            raise ValueError('results have a large standard deviation = %s, please give a higher precision.'%std)
+            raise ValueError('results ( = %s) have a large standard deviation = %s, please give a higher precision.'%(results,std))
     return None

@@ -3,7 +3,6 @@ load('TwistedNewform.sage')
 
 
 class QExpComputer(object):
-
     def __init__(self,E,d):
         self.E = E
         self.d = d
@@ -33,6 +32,10 @@ class QExpComputer(object):
         """
         return the first (terms) terms of the q-expansion of self.f at the cusp
         c = numerator/self.denom(). The default numerator is 1.
+        To-do: for different numerators, there's possible speedups, since
+        one do not need to to compute exp_chi each time. Solution: a new method
+        that computes expansions at all cusps of same denom together.
+
         """
         f = self.f
         d = self.d
@@ -42,25 +45,68 @@ class QExpComputer(object):
             numerator = ZZ(numerator)
         except:
             raise ValueError('numerator must be an integer.')
-        a = numerator.inverse_mod(self.denom())
-
         C = ComplexField(prec)
         q = var('q')
 
+
         result = C[[q]](0)
         for chi in self.characters():
-            verbose('working with Dirichlet character chi = %s'%chi)
+            #print ('working with Dirichlet character chi = %s'%chi)
             Tchi = TwistedNewform(f,chi)
             exp_chi = Tchi.expansion(d,terms,prec = prec)
-            verbose('expansion from chi = %s'%exp_chi)
-            result += exp_chi*C(chi(-a))
+            #print ('expansion from chi = %s'%exp_chi)
+            result += exp_chi*C(chi(-numerator))
 
 
         return result/euler_phi(d)
 
 
+    def all_numerators(self):
+        """
+        return a list of all possible numerators.
+        """
+        d = self.d
+        denom = self.denom()
+        v = d.coprime_integers(d)
+        return [find_coprime(num,denom,d) for num in v]
 
 
+    def all_expansions(self,prec = 53, **kwds):
+        """
+        the keywords are terms, prec (integers) and known_minimal (boolean).
+        """
+        f = self.f
+        d = self.d
+        numlist = self.all_numerators()
+        #alist = [num.inverse_mod(self.denom()) for num in numlist]
+        # question: do I need to take this inverse?
+        # print 'alist = %s'%alist
+        C = ComplexField(prec)
+        q = var('q')
+        R = C[[q]]
+        # exp_dict = dict.fromkeys(self.characters())
+        result_dict = dict([(a,R(0)) for a in numlist])
+        for chi in self.characters():
+            print ('working with Dirichlet character chi = %s'%chi)
+            Tchi = TwistedNewform(f,chi)
+            expChi =  Tchi.expansion(d, prec = prec,**kwds)
+            print ('expansion from chi is obtained.')
+            for a in numlist:
+                result_dict[a] += expChi*C(chi(-a))
+        return [g/euler_phi(d) for g in result_dict.values()]
+
+
+
+
+
+def find_coprime(num,denom,p):
+    """
+    find integers in a residue class of p that is coprime to
+    the given integer denom.
+    """
+    while gcd(num, denom) > 1:
+        num += p
+    return num
 
 """
 
