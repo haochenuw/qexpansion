@@ -1,21 +1,22 @@
 Organization of data:
     p -- a prime >= 5.
-    order -- an integer (3,4 or 6), the order of the character of (F_p^2)^* inducing a supercuspidal representation of GL_2(Q_p),
-    which arises as the local representation attached to some elliptic curve.
 
-    Under each order, we list on each line a pair 
+    order -- an integer (3,4 or 6), the order of the character of (F_p^2)^* inducing a supercuspidal representation of GL_2(Q_p),
+    which arises as the local representation attached to some elliptic curve. Under each order, we list on each line a pair
     			(l, l (mod p)),
-    where l runs through prime divisors of the prime-to-p-part of Norm(T), i.e., 
-    Norm(T)' = \frac{Norm(T)}{p^{ord_p(Norm(T)}}. 
+    where l runs through prime divisors of the prime-to-p-part of Norm(T), i.e.,
+
+            Norm(T)' = \frac{Norm(T)}{p^{ord_p(Norm(T)}}.
+    
     (If Norm(T) is a power of p, then T' = 1 and we do not list anything).
 
     T -- an algebraic number defined in http://perso.ens-lyon.fr/francois.brunault/recherche/ephi.pdf,
-    The Norm of T is (modulo a power of p) the norm of the first term of Fourier expansion 
-    of the modular form f_E at cusps of form p/N_E. To be more precise, we have 
-    We have Norm(a1) = Norm(T)/p^{p-1}, and Norm(a1)' = Norm(T)'. 
+    The Norm of T is (modulo a power of p) the norm of the first term of Fourier expansion
+    of the modular form f_E at the cusp of p/N_E. To be more precise, we have Norm(a1) = Norm(T)/p^{p-1},
+    and Norm(a1)' = Norm(T)'.
 
-    It turns out that we always have l \mid Norm(T)' \implies l \equiv \pm 1 \pmod{p}. I have 
-    verified this for 5 \leq p \leq 300. 
+    It turns out that we always have l \mid Norm(T)' \implies l \equiv \pm 1 \pmod{p}. I have
+    verified this for 5 \leq p \leq 300.
 
 
 
