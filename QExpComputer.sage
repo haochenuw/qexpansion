@@ -3,19 +3,16 @@ load('TwistedNewform.sage')
 
 
 class QExpComputer(object):
-    def __init__(self,E,d):
-        self.E = E
+    def __init__(self,f,d,sigma = None):
+        self.f = f
         self.d = d
-        self.N = E.conductor()
+        self.N = f.level()
         if self.N % (d^2):
             raise ValueError('the second argument squared must divide the conductor of E.')
-        self.f = E.modular_form()
+        self.sigma = sigma
 
     def __repr__(self):
-        return 'Computer for the q-expansion of the newform attached to the elliptic cuvrve %s at the cusp 1/%s'%(self.curve().label(), self.denom())
-
-    def curve(self):
-        return self.E
+        return 'Computer for the q-expansion of the newform %s (conjugated by %s) at the cusp 1/%s'%(self.f, self.sigma, self.denom())
 
     def denom(self):
         return self.N // self.d
@@ -48,13 +45,12 @@ class QExpComputer(object):
         C = ComplexField(prec)
         q = var('q')
 
-
         result = C[[q]](0)
         for chi in self.characters():
-            #print ('working with Dirichlet character chi = %s'%chi)
-            Tchi = TwistedNewform(f,chi)
+            # print ('working with Dirichlet character chi = %s'%chi)
+            Tchi = TwistedNewform(f,chi,sigma = self.sigma)
             exp_chi = Tchi.expansion(d,terms,prec = prec)
-            #print ('expansion from chi = %s'%exp_chi)
+            # print ('expansion from chi = %s'%exp_chi)
             result += exp_chi*C(chi(-numerator))
 
 
@@ -87,10 +83,10 @@ class QExpComputer(object):
         # exp_dict = dict.fromkeys(self.characters())
         result_dict = dict([(a,R(0)) for a in numlist])
         for chi in self.characters():
-            print ('working with Dirichlet character chi = %s'%chi)
+            #print ('working with Dirichlet character chi = %s'%chi)
             Tchi = TwistedNewform(f,chi)
             expChi =  Tchi.expansion(d, prec = prec,**kwds)
-            print ('expansion from chi is obtained.')
+            # print ('expansion from chi is obtained.')
             for a in numlist:
                 result_dict[a] += expChi*C(chi(-a))
         return [g/euler_phi(d) for g in result_dict.values()]

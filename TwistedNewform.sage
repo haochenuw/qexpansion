@@ -4,7 +4,7 @@ load('KnOperator.sage')
 
 class TwistedNewform(object):
 
-    def __init__(self,f,chi,check =False):
+    def __init__(self,f,chi,sigma = None):
         self.f = f
         self.chi = chi.minimize_base_ring()
         N = f.level()
@@ -12,10 +12,11 @@ class TwistedNewform(object):
         self.Q = Q
         self.N = N
         self.newformdata = None
+        self.sigma = sigma
 
 
     def __repr__(self):
-        return 'Twist of Newform %s by chi = %s'%(self.f.elliptic_curve().label(),self.chi)
+        return 'Twist of Newform %s (conjugated by %s) by chi = %s'%(self.f,self.sigma,self.chi)
 
     def character(self):
         """
@@ -52,16 +53,30 @@ class TwistedNewform(object):
             level = self.N
         chi = self.chi
         chisquare = (chi**2).primitive_character().minimize_base_ring()
-        A = ModularSymbols(chisquare.extend(level),sign = 1)
+        f = self.f
+
         K = chi.base_ring()
+        F = f.base_ring()
+        if F is not QQ:
+            dp = K[x](F.defining_polynomial())
+            L.<c> = K.extension(dp.factor()[0][0])
+        else:
+            L = K
+            c = 1
+        phi = K.embeddings(L)[0]
+        for psi0 in F.embeddings(L):
+            if psi0(F.gen()) == c:
+                psi = psi0
+                break
+
+        A = ModularSymbols(chisquare.extend(level),sign = 1)
         AK = A.base_extend(K)
         Anew = AK.new_submodule()
         AnewC = Anew.cuspidal_submodule()
-        f = self.f
 
         B = Gamma0(self.N).sturm_bound()
         an = f.qexp(B+1).padded_list(B+1)
-        anchi = [an[n]*chi(n) for n in range(len(an))]
+        anchi = [psi(an[n])*phi(chi(n)) for n in range(len(an))]
 
         AAnew = AnewC
 
@@ -69,8 +84,8 @@ class TwistedNewform(object):
         for p in prime_range(B+1):
             if gcd(p,Q) == 1:
                 Tp =  AAnew.hecke_operator(p)
-                fp = Tp.charpoly()
-                AAnew = (Tp - anchi[p]).kernel()
+                gg = anchi[p].minpoly()
+                AAnew =  gg(Tp).kernel()
 
         return AAnew.dimension() > 0
 
@@ -80,7 +95,7 @@ class TwistedNewform(object):
         """
         The twist is new if and only if it is not old.
         Should give the same result as is_new.
-        EX::
+        EXAMPLE::
             sage: f = EllipticCurve('50a').modular_form()
             sage: chi = DirichletGroup(5)[2]; T = TwistedNewform(f,chi)
             sage: T.is_new() == T._is_new()
@@ -102,9 +117,9 @@ class TwistedNewform(object):
         for d in D.divisors():
             oldlevel = M*d
             if oldlevel < N:
-                print 'checking on level %s'%oldlevel
+                #print 'checking on level %s'%oldlevel
                 if self.is_new(level = oldlevel):
-                    print 'not minimal! twist is new of level = %s'%oldlevel
+                    #print 'not minimal! twist is new of level = %s'%oldlevel
                     return False
         return True
 
@@ -246,7 +261,7 @@ class TwistedNewform(object):
         return chi', c, such that f|R_chi(M) = c f_chi'.
         We require that cond'(chi) = M.
         Use Delaunay's formula on page 74 of his ph.d. thesis.
-        Note that this method does not depend on finding the newform f \otimes \chi.
+        The output only depends on \chi, not on f.
         """
 
 
@@ -311,8 +326,8 @@ class TwistedNewform(object):
         returns the constant A mentioned in expansion_data_comp
         """
         # return w(f)w(g)*(the second output of delaunay_factors)
-        wf = self.al_eigenvalue()
-        wg = self.pseudo_eigenvalue(prec = prec, known_minimal = known_minimal)
+        wf = self.al_eigenvalue() # does not change when taking conjugates
+        wg = self.pseudo_eigenvalue(prec = prec, known_minimal = known_minimal) # does change!
         alconst = wf*wg
         verbose('alconst = %s'%alconst)
         delaunayconst = self._delaunay_factors(M,prec = prec)[1]
@@ -444,30 +459,52 @@ class TwistedNewform(object):
         """
         return self.f.atkin_lehner_eigenvalue()
 
-    def qexp_known_minimal(self,terms):
+    def qexp_known_minimal(self,terms,prec = 53):
         """
         return the q-expansion of f_\chi = f\otimes \chi (under the assumption
         that twist *is* a newform) and a complex embedding of its field of
         coefficients.
         """
+        sigma = self.sigma
         chi = self.chi
-        fq = self.f.qexp(terms)
-        Kchi = chi.base_ring()
-        if Kchi is not QQ:
-            phi = Kchi.complex_embeddings()[0] # to-do: add prec?
+        K = chi.base_ring()
+        f = self.f
+        F = f.base_ring()
+        if F is not QQ:
+            dp = K[x](F.defining_polynomial())
+            L.<c> = K.extension(dp.factor()[0][0])
         else:
-            phi = QQ.embeddings(QQ)[0]
-        fqL = fq.padded_list(terms)
-        gqL = [Kchi(fqL[n])*chi(n) for n in range(len(fqL))]
-        return (fq.parent().base_extend(Kchi)(gqL).add_bigoh(terms), phi)
+            L = K
+            c = 1
+        phi = K.embeddings(L)[0]
+        for psi0 in F.embeddings(L):
+            if psi0(F.gen()) == c:
+                psi = psi0
+                break
+        if L is not QQ:
+            tau = L.complex_embeddings(prec = prec)[0] # to-do: add prec?
+        else:
+            tau = QQ.complex_embedding(prec)
+
+        fq = self.f.qexp(terms)
+        fql = fq.padded_list(terms)
+        if sigma is not None: # non-trivial conjugate
+            gql = [psi(sigma(fql[n]))*phi(chi(n)) for n in range(len(fql))]
+        else:
+            gql = [psi(fql[n])*phi(chi(n)) for n in range(len(fql))]
+        q = var('q')
+        return (L[[q]](gql).add_bigoh(terms), tau)
 
     @cached_method
     def pseudo_eigenvalue(self,prec = 53,known_minimal = False):
         #First we deal with some easy cases:
         if known_minimal or self._is_new():
             # to-do: added direct code when we twist itself is a newform.
+            verbose('expanding to %s terms'%(prec*50))
             g, phi = self.qexp_known_minimal(prec*50)
-            return global_constant(g,phi,prec = prec,level = self.N)
+            const =  global_constant(g,phi,prec = prec,level = self.N)
+            verbose('global constant computed')
+            return const
         else:
             g,phi = self.newform()
             if ((self.chi)**2).conductor() == 1: # twist is on Gamma0(N).
@@ -499,9 +536,9 @@ class TwistedNewform(object):
             minimal = True
         elif self._is_new():
             minimal = True
-            print 'called is_new()'
+            # print 'called is_new()'
         if minimal:
-            gg,phi = self.qexp_known_minimal(terms+10)
+            gg,phi = self.qexp_known_minimal(terms+10, prec = prec)
             v = [(1,1)]
             verbose('since twist is newform, we can compute directly.')
 
@@ -511,10 +548,9 @@ class TwistedNewform(object):
             v = self.expansion_data_comp()
 
         q = gg.parent().gen()
-
         verbose('v = %s'%v)
 
-
+        # print 'gg, phi = %s, %s'%(gg,phi)
         # add up the result. v contains the constants plus the B_p information.
         result = [0 for _ in range(terms)]
         for coeff, d in v:
@@ -527,5 +563,11 @@ class TwistedNewform(object):
         return C(const)*C[[q]](result).add_bigoh(terms)
 
 
-
+def composite(F,K):
+    g = K.defining_polynomial()
+    L.<b> = F.extension(g)
+    L = L.absolute_field('c')
+    phiK = K.embeddings(L)[0]
+    phiF = F.embeddings(L)[0]
+    return L,phiF,phiK
 

@@ -14,6 +14,7 @@ def generate_points(N,number_of_points = 5,prec = 53):
     thetas = [C(0.4*random() + 0.1) for _ in range(number_of_points)]
     verbose('A list of random angles theta computed')
     zs = [C(1/sqrt(N))*C(exp(C(pi)*C(I)*theta)) for theta in thetas]
+    verbose('upper half plane points obtained.')
     return zs
 
 
@@ -28,6 +29,8 @@ def period(f,phi,a,b,terms = None, prec =53):
         f = f.q_expansion(terms)
     except:
         pass
+
+    verbose('got here on compuing periods, terms = %s'%f.prec())
     C = ComplexField(prec)
 
 
@@ -41,9 +44,15 @@ def period(f,phi,a,b,terms = None, prec =53):
     else:
         q = var('q')
         ffpC = C[q](ff.polynomial())
+    endpt = C(exp(2*C(pi)*C(I)*C(b)))
+    startpt = C(exp(2*C(pi)*C(I)*C(a)))
+    verbose('two end points computed')
 
-    return ffpC.substitute(C(exp(2*C(pi)*C(I)*C(b)))) - ffpC.substitute(C(exp(2*C(pi)*C(I)*C(a))))
+    result = ffpC.substitute(endpt) - ffpC.substitute(startpt)
 
+    verbose('substitution made')
+
+    return result
 
 def global_constant(f,phi,points = 5,prec = 53,terms = 1000,level = None):
     """
