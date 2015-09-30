@@ -8,14 +8,18 @@ class QExpComputer(object):
         self.d = d
         self.N = f.level()
         if self.N % (d^2):
-            raise ValueError('the second argument squared must divide the conductor of E.')
+            raise ValueError('the dprime (%s) squared must divide the level of f (%s).'%(self.d, self.N))
         self.sigma = sigma
+        self.weight = f.weight()
 
     def __repr__(self):
-        return 'Computer for the q-expansion of the newform %s (conjugated by %s) at the cusp 1/%s'%(self.f, self.sigma, self.denom())
+        return 'Computer for the q-expansion of the newform %s of weight %s (conjugated by %s) at the cusp 1/%s'%(self.f, self.weight, self.sigma, self.denom())
 
     def denom(self):
         return self.N // self.d
+
+    def weight(self):
+        return self.weight
 
     def characters(self):
         """
