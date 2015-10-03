@@ -3,6 +3,11 @@ load('TwistedNewform.sage')
 
 
 class QExpComputer(object):
+    """
+    f -- a modular form.
+    d -- N / (denominator of the cusp).
+    sigma -- ??
+    """
     def __init__(self,f,d,sigma = None):
         self.f = f
         self.d = d
@@ -36,6 +41,14 @@ class QExpComputer(object):
         To-do: for different numerators, there's possible speedups, since
         one do not need to to compute exp_chi each time. Solution: a new method
         that computes expansions at all cusps of same denom together.
+
+
+        Examples::
+        
+        sage: f = EllipticCurve('48a').modular_form()
+        sage: Q = QExpComputer(f,4)
+        sage: Q.expansion_numerical()
+        -0.000000000000000 - 0.000000000000000*q + (-2.44929359829471e-16 - 2.00000000000000*I)*q^2 - 0.000000000000000*q^3 - 0.000000000000000*q^4 - 0.000000000000000*q^5 + (2.44929359829471e-16 + 2.00000000000000*I)*q^6 - 0.000000000000000*q^7 - 0.000000000000000*q^8 - 0.000000000000000*q^9 + (4.89858719658941e-16 + 4.00000000000000*I)*q^10 + O(q^15)
 
         """
         f = self.f
