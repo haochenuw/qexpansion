@@ -7,14 +7,14 @@ class TwistedNewform(object):
     def __init__(self,f,chi,sigma = None):
         self.f = f
         self.chi = chi.minimize_base_ring()
-        N = f.level()
-        Q = chi.conductor()
-        self.Q = Q
-        self.N = N
+        self.N = f.level()
+        self.Q = chi.conductor()
         self.newformdata = None
         self.sigma = sigma
         self.weight = f.weight()
-
+        self.Kf = self.f.base_ring()
+        self.phi_f  = self.Kf.embeddings(QQbar)[0] # an embedding into QQbar.
+        self.phi_chi = chi.base_ring().embeddings(QQbar)[0] # fix an embedding of chi
 
     def __repr__(self):
         return 'Twist of Newform %s (conjugated by %s) by chi = %s'%(self.f,self.sigma,self.chi)
@@ -131,63 +131,30 @@ class TwistedNewform(object):
                     return False
         return True
 
-    def field_of_definition(self):
-        """
-        Return a tuple (L,phi, psi), where L is the field of composition L = FK,
-        where K = field of chi, F = field of f, and phi : K \to L and psi: F \to L
-        are fixed embeddings.
-        """
-        chi = self.chi.primitive_character()
-        K = chi.base_ring()
-        f = self.f
-        F = f.base_ring()
-        if F is not QQ:
-            dp = K[x](F.defining_polynomial())
-            L.<c> = K.extension(dp.factor()[0][0])
-        else:
-            L = K
-            c = 1
-        phi = K.embeddings(L)[0]
-        foundIt = False
-        for psi0 in F.embeddings(L):
-            if psi0(F.gen()) == c:
-                psi = psi0
-                foundIt = True
-                break
-        if not foundIt:
-            raise ValueError
-        else:
-            return L, phi, psi
 
 
-
+    @cached_method
     def newform(self):
         """
         returns a tuple(g,phi)
         where g is a newform of some level corr to f_chi
         and phi is a embedding of K_g into K_chi
         """
-        if self.newformdata is not None:
-            return self.newformdata
         f = self.f
         N = self.N
         chi = self.chi
         Q = self.Q
         if Q == 1:
             verbose('twist is trivial')
-            self.newformdata = (f,QQ.embeddings(QQ)[0])
-            return self.newformdata
+            return (f,self.phi_f)
+
 
         B = self.B_bound()
         verbose('B-bound = %s'%B)
 
-        fqB = list(f.qexp(B+10))
+        fqB = f.qexp(B+10).padded_list()
         chisquare = (chi^2).primitive_character()
         Q1 = chisquare.conductor()
-
-
-
-        L,phi,psi = self.field_of_definition()
 
         # Kchi = chi.base_ring()
         name = 'chi'
@@ -202,30 +169,28 @@ class TwistedNewform(object):
 
         M0 = lcm(Q1,Nprime)
 
+
+
         for M in N.divisors():
             if M % M0 == 0:
                 verbose('Working on level M = %s'%M)
-                glist = CuspForms(chisquare.extend(M),k).newforms('a'+name+'M%s'%M)
+
+                # work hard to give a unique name.
+                glist = CuspForms(chisquare.extend(M),k).newforms(name+'M%s'%M)
                 verbose('Number of conjugacy classes of newforms on level %s is %s'%(M,len(list(glist))))
                 for g in glist:
-                    verbose('Working with the newform g = %s'%g)
+                    verbose('Working with the newform g = %s on level %s'%(g,M))
                     Kg = g.base_ring()
-                    if Kg is not QQ:
-                        Lg = Kg.absolute_field('c')
-                        from_L, to_L = Lg.structure()
-                    else:
-                        Lg = Kg
-                        to_L = Kg.embeddings(QQ)[0]
-                    v = Lg.embeddings(L)
 
-                    if len(v) > 0:
-                        gqB  = list(g.qexp(B+10))
-                        for tau in v:
-                            verbose('phi = %s'%phi)
-                            if all([tau(to_L(gqB[n])) == psi(fqB[n])*phi(chi(n)) for n in range(1,B+1) if gcd(n,Q) == 1]):
-                                verbose('found the twisted newform.')
-                                self.newformdata = (g,tau) # save the result
-                                return (g,tau)
+
+                    phi_g_list = Kg.embeddings(QQbar)
+
+                    gqB  = g.qexp(B+10).padded_list()
+                    for tau in phi_g_list:
+                        if all([tau(gqB[n]) == self.phi_f(fqB[n])*self.phi_chi(chi(n)) for n in range(1,B+1) if gcd(n,Q) == 1]):
+                            verbose('found the twisted newform.')
+                            self.newformdata = (g,tau) # save the result
+                            return (g,tau)
 
         raise ValueError('newform not found for chi = %s! Please debug.'%self.chi)
 
@@ -588,7 +553,6 @@ class TwistedNewform(object):
             minimal = True
         elif self._is_new():
             minimal = True
-            # print 'called is_new()'
         if minimal:
             gg,phi = self.qexp_known_minimal(terms+10, prec = prec)
             v = [(1,1)]
@@ -613,6 +577,22 @@ class TwistedNewform(object):
             result = [a+C(coeff)*b for a,b in zip(result,newcoeffs)]
         q = var('q')
         return C(const)*C[[q]](result).add_bigoh(terms)
+
+
+    def is_inner_twist(self, galois = None):
+        """
+        return True if f \otimes \chi is a Galois conjugate of f.
+        """
+        B = self.B_bound()
+        g, phi = self.newform()
+        fqB, gqB = f.qexp(B+10).padded_list(), g.qexp(B+10).padded_list()
+        for sigma in self.Kf.embeddings(QQbar):
+            if [sigma(aa) for aa in fqB] == [phi(bb) for bb in gqB]:
+                if galois:
+                    return (True, sigma)
+                return True
+        return False
+
 
 
 def composite(F,K):
